@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message, red, green, Customer } = require('./lib/helpers')
+const { handle_message, send_message, red, green, Customer, Teller, guidGenerator } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
 // let Customer = require('./customer')
 
 let connectedTellers = []
 let connectedCustomers = []
+let currentlyBeingServed = []
 let customerCount = 1
 let openForTheDay = false
 
@@ -46,10 +47,34 @@ const server = net.createServer(conn => {
 		let message = packet.message
 		let type = packet.type
 
+		let currentConnections = [...currentlyBeingServed, ...connectedTellers]
+		let current = currentConnections.find((connection) => connection.conn === conn)
+
+		let tellerPrefix 
+		let customerPrefix
+
+		if (current && current.serverId) {
+			let id = current.serverId
+			
+			let server = connectedTellers.find((teller) => teller.serverId === id)
+			let customer = currentlyBeingServed.find((cust) => cust.serverId === id)
+
+			if (current.role === 'teller') {
+				tellerPrefix = '(you) '
+		 		customerPrefix = '[ TELLER ] '
+			}
+			else {
+				tellerPrefix = `(Customer ${customer.customerCount}) `
+		 		customerPrefix = '[ YOU ] '
+			}
+
+			send_message(server.conn, tellerPrefix + message)
+			send_message(customer.conn, customerPrefix + message)
+		}
 		// Checks for customer connection
-		if (message === 'connected' && type === 'customer') {
+		else if (message === 'connected' && type === 'customer') {
 			console.log('Customer connected')
-			const customer = new Customer(customerCount, conn)
+			const customer = new Customer(customerCount, conn, null)
 			connectedCustomers.push(customer)
 			customerCount++
 
@@ -62,7 +87,8 @@ const server = net.createServer(conn => {
 		// Checks for teller connection
 		else if (message === 'connected' && type === 'teller') {
 			console.log('Teller connected')
-			connectedTellers.push(conn)
+			let teller = new Teller(null, conn)
+			connectedTellers.push(teller)
 
 			send_message(conn, `Good Morning\nYou are not serving any customers\nYou have ${connectedCustomers.length} customers waiting in line\n`)
 
@@ -70,8 +96,12 @@ const server = net.createServer(conn => {
 
 		}
 		else if (message === 'next' && type === 'teller' && connectedCustomers.length) {
-
+			let currentTeller = connectedTellers.find((teller) => teller.conn === conn)
 			let servingCustomer = connectedCustomers.shift()
+			currentlyBeingServed.push(servingCustomer)
+			let newUid =  guidGenerator()
+			currentTeller.serverId = newUid
+			servingCustomer.serverId = newUid
 			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
 
 			displayQueuePosition()
