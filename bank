@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message, red, green, Customer, Teller, guidGenerator } = require('./lib/helpers')
+const { handle_message, send_message, red, green, Customer, Teller, guidGenerator, updateChat, toNumber } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
 // let Customer = require('./customer')
 
@@ -40,6 +40,47 @@ function displayQueuePosition() {
 	if (!openForTheDay) openForTheDay = true
 }
 
+function inChat(current, message) {
+	
+
+	let id = current.serverId
+
+	let server = connectedTellers.find((teller) => teller.serverId === id)
+	let customer = currentlyBeingServed.find((cust) => cust.serverId === id)
+
+	updateChat(current, server, customer, message)
+
+	message = message.split(' ')
+
+	// Set everything to lowercase to easily compare
+	const lower = message.map(element => {
+		return element.toLowerCase();
+	  })
+
+	  if (lower.includes('withdraw') && current.role === 'customer') {
+		let withdrawAmount
+		// Grabs the amount that comes after the word withdraw
+		try {
+		withdrawAmount = toNumber(lower[lower.indexOf('withdraw')+ 1])
+		} catch {
+			updateChat(current, server, customer, 'Invalid withdraw statement... Try again with a dollar amount')
+			return
+		}
+
+		let remainingBalance = customer.balance - withdrawAmount 
+		let willOverdraft = remainingBalance < 0
+		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
+
+		send_message(customer.conn, '[ TELLER ] Please wait while I review the transaction...')
+
+
+
+	}
+
+
+
+}
+
 // TCP Server using a Unix socket
 const server = net.createServer(conn => {
 
@@ -50,26 +91,10 @@ const server = net.createServer(conn => {
 		let currentConnections = [...currentlyBeingServed, ...connectedTellers]
 		let current = currentConnections.find((connection) => connection.conn === conn)
 
-		let tellerPrefix 
-		let customerPrefix
+
 
 		if (current && current.serverId) {
-			let id = current.serverId
-			
-			let server = connectedTellers.find((teller) => teller.serverId === id)
-			let customer = currentlyBeingServed.find((cust) => cust.serverId === id)
-
-			if (current.role === 'teller') {
-				tellerPrefix = '(you) '
-		 		customerPrefix = '[ TELLER ] '
-			}
-			else {
-				tellerPrefix = `(Customer ${customer.customerCount}) `
-		 		customerPrefix = '[ YOU ] '
-			}
-
-			send_message(server.conn, tellerPrefix + message)
-			send_message(customer.conn, customerPrefix + message)
+			inChat(current, message)
 		}
 		// Checks for customer connection
 		else if (message === 'connected' && type === 'customer') {
@@ -99,7 +124,7 @@ const server = net.createServer(conn => {
 			let currentTeller = connectedTellers.find((teller) => teller.conn === conn)
 			let servingCustomer = connectedCustomers.shift()
 			currentlyBeingServed.push(servingCustomer)
-			let newUid =  guidGenerator()
+			let newUid = guidGenerator()
 			currentTeller.serverId = newUid
 			servingCustomer.serverId = newUid
 			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
