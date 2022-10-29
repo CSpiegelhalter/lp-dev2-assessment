@@ -10,7 +10,7 @@ function connection_ready() {
 	render([
 		'Hello Customer'
 	])
-	send_message(conn, 'customer')
+	send_message(conn, 'customer', 'customer')
 }
 
 
@@ -23,13 +23,14 @@ function connection_closed() {
 
 handle_input(line => {
 	// console.log(`Prompt command entered:`, line)
-	send_message(conn, line)
+	send_message(conn, line, 'customer')
 })
 
 
 
-handle_message(conn, message => {
-	console.log('Message received:', message)
+handle_message(conn, packet => {
+
+	console.log('Message received:', packet.message)
 })
 
 

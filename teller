@@ -10,7 +10,7 @@ function connection_ready() {
 	render([
 		'Hello Teller'
 	])
-	send_message(conn, 'teller')
+	send_message(conn, 'teller', 'teller')
 }
 
 
@@ -21,16 +21,10 @@ handle_input(line => {
 
 
 
-handle_message(conn, message => {
-	console.log(message)
+handle_message(conn, packet => {
+	// console.log(packet.type)
+	// console.log(packet.message)
 })
-
-
-
-
-
-
-
 
 
 
