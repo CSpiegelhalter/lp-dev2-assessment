@@ -65,6 +65,9 @@ const server = net.createServer(conn => {
 			send_message(conn, `The Bank is ${red('closed')}`)
 			send_message(conn, `[ SYSTEM ] The Bank is ${red('closed')}`)
 		}
+		else {
+			send_message(conn, `[ SYSTEM ] You are not currently being served.`)
+		}
 		// send_message(conn, `I, the Bank, received: ${message}`)
 	})
 
