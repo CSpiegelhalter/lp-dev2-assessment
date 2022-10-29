@@ -13,27 +13,29 @@ let openForTheDay = false
  * Alerts each customer of their queue position 
  */
 function displayQueuePosition() {
-	connectedCustomers.map((customer, index) => {
-		// First connected teller means bank is now open!
-		if (!openForTheDay) {
-			send_message(customer, `The Bank is ${green('open.')}`)
-			openForTheDay = true
-		}
+	if (connectedCustomers.length) {
+		connectedCustomers.map((customer, index) => {
+			// First connected teller means bank is now open!
+			if (!openForTheDay) {
+				send_message(customer.conn, `The Bank is ${green('open.')}`)
+				openForTheDay = true
+			}
 
-		// Next customer in line
-		if (index === 0) {
-			send_message(customer, 'You are the next customer to be served.')
-		}
-		// Every other customer
-		else {
-			send_message(
-				customer,
-				`There is ${connectedCustomers.length -
-				  1} customers in line ahead of you`
-			  )
-		}
+			// Next customer in line
+			if (index === 0) {
+				send_message(customer.conn, 'You are the next customer to be served.')
+			}
+			// Every other customer
+			else {
+				send_message(
+					customer.conn,
+					`There is ${connectedCustomers.length -
+					1} customers in line ahead of you`
+				)
+			}
 
-	})
+		})
+	}
 }
 
 // TCP Server using a Unix socket
@@ -49,7 +51,7 @@ const server = net.createServer(conn => {
 		// Checks for customer connection
 		if (message === 'customer') {
 			console.log('Customer connected')
-			connectedCustomers.push({conn, customerCount})
+			connectedCustomers.push({ conn, customerCount })
 			customerCount++
 
 			// No tellers connected
@@ -69,13 +71,17 @@ const server = net.createServer(conn => {
 				conn,
 				`You have ${connectedCustomers.length} customers waiting in line`
 			)
-			
+
 			displayQueuePosition()
-			
+
 		}
 		else if (message === 'next' && type === 'teller' && connectedCustomers.length) {
-			send_message(conn, `You are serving customer #${connectedCustomers[0].customerCount}.`)
+			let servingCustomer = connectedCustomers.shift()
+			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.`)
 			send_message(conn, `You have ${connectedCustomers.length} waiting in line.`)
+
+
+
 		}
 
 		// Recieved a message with no connected tellers
@@ -112,7 +118,7 @@ process.on('exit', shutdown)
 process.on('SIGINT', shutdown)
 process.on('SIGTERM', shutdown)
 
-process.on('uncaughtException',function(err){
+process.on('uncaughtException', function (err) {
 	console.log('Uncaught ERROR:', err)
 })
 

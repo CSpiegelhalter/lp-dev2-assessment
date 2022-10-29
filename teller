@@ -16,7 +16,7 @@ function connection_ready() {
 
 
 handle_input(line => {
-	console.log(`Prompt command entered:`, line)
+	console.log('(you)', line)
 })
 
 
