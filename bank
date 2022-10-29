@@ -3,7 +3,6 @@
 const net = require('net')
 const { handle_message, send_message, red, green, Customer, Teller, guidGenerator, updateChat, toNumber, connectedTellers, connectedCustomers, currentlyBeingServed, removeClosedConnections } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
-// let Customer = require('./customer')
 
 let customerCount = 1
 let openForTheDay = false
@@ -21,17 +20,26 @@ function displayQueuePosition() {
 
 			// Next customer in line
 			if (index === 0) {
-				send_message(customer.conn, 'You are the next customer to be served.')
+				// Set timeouts because it might error if we send messages too quickly
+				setTimeout(() => {
+					send_message(customer.conn, 'You are the next customer to be served.')
+				}, 200)
+
 			}
 			// Every other customer
 			else {
-				send_message(
-					customer.conn,
-					`There is ${connectedCustomers.length -
-					1} customers in line ahead of you`
-				)
+				// Set timeouts because it might error if we send messages too quickly
+				setTimeout(() => {
+					send_message(
+						customer.conn,
+						`There is ${connectedCustomers.length -
+						1} customers in line ahead of you`
+					)
+				}, 300)
+
 			}
-			if (!connectedTellers.length) {
+			// Notify customers the tellers have all disconnected
+			if (!connectedTellers.length && openForTheDay) {
 				send_message(customer.conn, '[ SYSTEM ] There are currently no tellers available. Please wait.\n')
 			}
 
@@ -40,63 +48,82 @@ function displayQueuePosition() {
 	if (!openForTheDay) openForTheDay = true
 }
 
+/**
+ * @param current  Current connection sending message
+ * @param message  Message to send
+ * Handles many chat routes such as money withdraw and withdraw confirmation
+ */
 function inChat(current, message) {
 
+	// Customer cannot initiate anything while they're in the act of transacting
 	if (current.role === 'customer' && current.transacting) {
 		send_message(current.conn, '[ SYSTEM ] You already have a transaction in progress. Please wait.')
 		return
 	}
-	let id = current.serverId
 
+	let id = current.serverId
 	let server = connectedTellers.find((teller) => teller.serverId === id)
 	let customer = currentlyBeingServed.find((cust) => cust.serverId === id)
 
 	updateChat(current, server, customer, message)
 
-	message = message.split(' ')
-
 	// Set everything to lowercase to easily compare
+	message = message.split(' ')
 	const lower = message.map(element => {
 		return element.toLowerCase();
 	})
+
+	// Join back in case it isn't just a withdraw
 	message = message.join('')
 
+	// Only a customer will withdraw
 	if (lower.includes('withdraw') && current.role === 'customer') {
 		let withdrawAmount
 		// Grabs the amount that comes after the word withdraw
 		try {
 			withdrawAmount = toNumber(lower[lower.indexOf('withdraw') + 1])
 		} catch {
+			// Just in case someone is going crazy on their keyboard... 
 			updateChat(current, server, customer, 'Invalid withdraw statement... Try again with a dollar amount')
 			return
 		}
 
 		let remainingBalance = customer.balance - withdrawAmount
 		let willOverdraft = remainingBalance < 0
+
+		// No overdrafting is allowed. We immediately go back
 		if (willOverdraft) {
 			send_message(customer.conn, `[ SYSTEM ] You have insufficient funds. Funds available: $${customer.balance}`)
 			send_message(server.conn, `[ WARNING: Denied overdraft. Attempted withdrawal: $${withdrawAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
 			return
 		}
-		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
 
+		// We wait for teller to confirm the transaction
+		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
 		send_message(customer.conn, '[ TELLER ] Please wait while I review the transaction...')
+
+		// Set values so customer cannot try to do another transaction before this one is comeplete
 		customer.transacting = true
 		customer.transactionAmount = withdrawAmount
 
 	}
+	// Teller confirms transaction
 	else if (message === 'yes') {
 		customer.balance -= customer.transactionAmount
 		send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
 
 		send_message(customer.conn, `[ TELLER ] Your withdrawal is complete! Your new balance is $${customer.balance}\n`)
+
+		// Reset values so customer can try another transaction
 		customer.transactionAmount = 0
 		customer.transacting = false
 	}
 	else if (message === 'no') {
 		send_message(server.conn, `[ WITHDRAWAL DENIED: $${customer.transactionAmount} ]`)
 
-		send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.balance} is DENIED! Get lost sucker!\n`)
+		send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.transactionAmount} is DENIED! Get lost sucker!\n`)
+
+		// Reset values so customer can try another transaction
 		customer.transactionAmount = 0
 		customer.transacting = false
 	}
@@ -112,15 +139,16 @@ const server = net.createServer(conn => {
 		let message = packet.message
 		let type = packet.type
 
+		// Find what connection is active
 		let currentConnections = [...currentlyBeingServed, ...connectedTellers]
 		let current = currentConnections.find((connection) => connection.conn === conn)
 
 
-
+		// Withdraw functionality
 		if (current && current.serverId && message !== 'next') {
 			inChat(current, message)
 		}
-		// Checks for customer connection
+		// Checks for new customer connection
 		else if (message === 'connected' && type === 'customer') {
 			console.log('Customer connected')
 			const customer = new Customer(customerCount, conn, null)
@@ -133,7 +161,7 @@ const server = net.createServer(conn => {
 			}
 		}
 
-		// Checks for teller connection
+		// Checks for new teller connection
 		else if (message === 'connected' && type === 'teller') {
 			console.log('Teller connected')
 			let teller = new Teller(null, conn)
@@ -144,23 +172,26 @@ const server = net.createServer(conn => {
 			displayQueuePosition()
 
 		}
+		// Teller decides to take a customer
 		else if (message === 'next' && type === 'teller') {
-			let currentTeller = connectedTellers.find((teller) => teller.conn === conn)
-			if (currentTeller.serverId) {
-				let oldCustomer = currentlyBeingServed.find((cust) => cust.serverId === currentTeller.serverId)
-				currentTeller.serverId = null
+			// If teller has a current customer, we need to tell that customer we are breaking up
+			if (current.serverId) {
+				let oldCustomer = currentlyBeingServed.find((cust) => cust.serverId === current.serverId)
+				current.serverId = null
 				send_message(oldCustomer.conn, `[ TELLER ] Ok, you're done. Have a great day!\n\n[ DISCONNECTED ]`)
+
+				// Let them down.... easy
 				oldCustomer.conn.destroy()
-				const index = currentlyBeingServed.indexOf(oldCustomer)
-				if (index > -1) {
-					currentlyBeingServed.splice(index, 1)
-				}
+				removeClosedConnections()
 			}
+			// Teller will grab a new customer from queue
 			if (connectedCustomers.length) {
 				let servingCustomer = connectedCustomers.shift()
 				currentlyBeingServed.push(servingCustomer)
+
+				// ID to keep track of Teller/Customer pair
 				let newUid = guidGenerator()
-				currentTeller.serverId = newUid
+				current.serverId = newUid
 				servingCustomer.serverId = newUid
 				send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
 
@@ -168,8 +199,9 @@ const server = net.createServer(conn => {
 
 				send_message(servingCustomer.conn, '[ CHAT ]\n[ TELLER ] What can I help you with?\n')
 			}
+			// There are no customers in queue
 			else {
-				send_message(currentTeller.conn, 'You are not serving any customers.\nYou have 0 customers waiting in line.')
+				send_message(current.conn, 'You are not serving any customers.\nYou have 0 customers waiting in line.')
 			}
 
 
@@ -179,6 +211,7 @@ const server = net.createServer(conn => {
 		else if (!connectedTellers.length && type === 'customer') {
 			send_message(conn, `The Bank is ${red('closed')}\n[ SYSTEM ] The Bank is ${red('closed')}`)
 		}
+		// Customer is being impatient...
 		else if (type === 'customer') {
 			send_message(conn, `[ SYSTEM ] You are not currently being served.`)
 		}
