@@ -22,7 +22,7 @@ handle_input(line => {
 
 
 handle_message(conn, message => {
-	console.log('Message received:', message)
+	console.log(message)
 })
 
 

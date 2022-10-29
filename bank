@@ -1,10 +1,11 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message, red } = require('./lib/helpers')
+const { handle_message, send_message, red, green } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
 
 let connectedTellers = []
+let connectedCustomers = []
 
 // TCP Server using a Unix socket
 const server = net.createServer(conn => {
@@ -17,6 +18,7 @@ const server = net.createServer(conn => {
 		// Checks for customer connection
 		if (message === 'customer') {
 			console.log('Customer connected')
+			connectedCustomers.push(conn)
 
 			// No tellers connected
 			if (!connectedTellers.length) {
@@ -28,6 +30,34 @@ const server = net.createServer(conn => {
 		else if (message === 'teller') {
 			console.log('Teller connected')
 			connectedTellers.push(conn)
+
+			send_message(conn, 'Good Morning\n')
+			send_message(conn, 'You are not serving any customers\n')
+			send_message(
+				conn,
+				`You have ${connectedCustomers.length} customers waiting in line`
+			)
+
+			connectedCustomers.map((customer, index) => {
+				// First connected teller means bank is now open!
+				if (connectedTellers.length === 1) {
+					send_message(customer, `The Bank is ${green('open.')}`)
+				}
+
+				// Next customer in line
+				if (index === 0) {
+					send_message(customer, 'You are the next customer to be served.')
+				}
+				// Every other customer
+				else {
+					send_message(
+						customer,
+						`There is ${connectedCustomers.length -
+						  1} customers in line ahead of you`
+					  )
+				}
+
+			})
 		}
 
 		// Recieved a message with no connected tellers
