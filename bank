@@ -64,12 +64,7 @@ const server = net.createServer(conn => {
 			console.log('Teller connected')
 			connectedTellers.push(conn)
 
-			send_message(conn, 'Good Morning\n')
-			send_message(conn, 'You are not serving any customers\n')
-			send_message(
-				conn,
-				`You have ${connectedCustomers.length} customers waiting in line`
-			)
+			send_message(conn, `Good Morning\nYou are not serving any customers\nYou have ${connectedCustomers.length} customers waiting in line\n`)
 
 			displayQueuePosition()
 
@@ -88,13 +83,11 @@ const server = net.createServer(conn => {
 
 		// Recieved a message with no connected tellers
 		else if (!connectedTellers.length) {
-			send_message(conn, `The Bank is ${red('closed')}`)
-			send_message(conn, `[ SYSTEM ] The Bank is ${red('closed')}`)
+			send_message(conn, `The Bank is ${red('closed')}\n[ SYSTEM ] The Bank is ${red('closed')}`)
 		}
 		else if (type === 'customer') {
 			send_message(conn, `[ SYSTEM ] You are not currently being served.`)
 		}
-		// send_message(conn, `I, the Bank, received: ${message}`)
 	})
 
 

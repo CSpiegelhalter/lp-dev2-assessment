@@ -16,7 +16,6 @@ function connection_ready() {
 
 
 handle_input(line => {
-	// console.log('(you)', line)
 	send_message(conn, line, 'teller')
 })
 
