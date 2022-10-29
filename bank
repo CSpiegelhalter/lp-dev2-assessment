@@ -41,7 +41,7 @@ function displayQueuePosition() {
 }
 
 function inChat(current, message) {
-	
+
 
 	let id = current.serverId
 
@@ -55,26 +55,46 @@ function inChat(current, message) {
 	// Set everything to lowercase to easily compare
 	const lower = message.map(element => {
 		return element.toLowerCase();
-	  })
+	})
+	message = message.join('')
 
-	  if (lower.includes('withdraw') && current.role === 'customer') {
+	if (lower.includes('withdraw') && current.role === 'customer') {
 		let withdrawAmount
 		// Grabs the amount that comes after the word withdraw
 		try {
-		withdrawAmount = toNumber(lower[lower.indexOf('withdraw')+ 1])
+			withdrawAmount = toNumber(lower[lower.indexOf('withdraw') + 1])
 		} catch {
 			updateChat(current, server, customer, 'Invalid withdraw statement... Try again with a dollar amount')
 			return
 		}
 
-		let remainingBalance = customer.balance - withdrawAmount 
+		let remainingBalance = customer.balance - withdrawAmount
 		let willOverdraft = remainingBalance < 0
+		if (willOverdraft) {
+			send_message(customer.conn, `[ SYSTEM ] You have insufficient funds. Funds available: $${customer.balance}`)
+		}
 		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
 
 		send_message(customer.conn, '[ TELLER ] Please wait while I review the transaction...')
+		customer.transacting = true
+		customer.transactionAmount = withdrawAmount
 
+	}
+	else if (message === 'yes') {
+		send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]`)
+		customer.balance -= customer.transactionAmount
+		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
 
+		send_message(customer.conn, `[ TELLER ] Your withdrawal is complete! Your new balance is $${customer.balance}\n`)
+		customer.transactionAmount = 0
+		customer.transacting = false
+	}
+	else if (message === 'no') {
+		send_message(server.conn, `[ WITHDRAWAL DENIED: $${customer.transactionAmount} ]`)
 
+		send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.balance} is DENIED! Get lost sucker!\n`)
+		customer.transactionAmount = 0
+		customer.transacting = false
 	}
 
 
