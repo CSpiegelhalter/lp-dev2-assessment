@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { render, handle_input, handle_message } = require('./lib/helpers')
+const { render, handle_input, handle_message, send_message } = require('./lib/helpers')
 const conn = net.createConnection('./bank.sock')
 
 
@@ -10,6 +10,7 @@ function connection_ready() {
 	render([
 		'Hello Teller'
 	])
+	send_message(conn, 'teller')
 }
 
 

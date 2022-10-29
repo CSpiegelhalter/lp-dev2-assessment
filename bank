@@ -1,10 +1,10 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message } = require('./lib/helpers')
+const { handle_message, send_message, red } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
 
-
+let connectedTellers = []
 
 // TCP Server using a Unix socket
 const server = net.createServer(conn => {
@@ -16,6 +16,14 @@ const server = net.createServer(conn => {
 
 		if (message === 'customer') {
 			console.log('Customer connected')
+			if (!connectedTellers.length) {
+				send_message(conn, `The Bank is ${red('closed.')}`)
+			}
+		}
+
+		if (message === 'teller') {
+			console.log('Teller connected')
+			connectedTellers.push(conn)
 		}
 		send_message(conn, `I, the Bank, received: ${message}`)
 	})
