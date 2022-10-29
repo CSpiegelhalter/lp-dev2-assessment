@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message, red, green } = require('./lib/helpers')
+const { handle_message, send_message, red, green, Customer } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
+// let Customer = require('./customer')
 
 let connectedTellers = []
 let connectedCustomers = []
@@ -18,7 +19,6 @@ function displayQueuePosition() {
 			// First connected teller means bank is now open!
 			if (!openForTheDay) {
 				send_message(customer.conn, `The Bank is ${green('open.')}`)
-				openForTheDay = true
 			}
 
 			// Next customer in line
@@ -36,22 +36,21 @@ function displayQueuePosition() {
 
 		})
 	}
+	if (!openForTheDay) openForTheDay = true
 }
 
 // TCP Server using a Unix socket
 const server = net.createServer(conn => {
-	console.log('client connected')
-
 
 	handle_message(conn, packet => {
 		let message = packet.message
 		let type = packet.type
-		console.log('received:', message)
 
 		// Checks for customer connection
-		if (message === 'customer') {
+		if (message === 'connected' && type === 'customer') {
 			console.log('Customer connected')
-			connectedCustomers.push({ conn, customerCount })
+			const customer = new Customer(customerCount, conn)
+			connectedCustomers.push(customer)
 			customerCount++
 
 			// No tellers connected
@@ -61,7 +60,7 @@ const server = net.createServer(conn => {
 		}
 
 		// Checks for teller connection
-		else if (message === 'teller') {
+		else if (message === 'connected' && type === 'teller') {
 			console.log('Teller connected')
 			connectedTellers.push(conn)
 
@@ -76,11 +75,24 @@ const server = net.createServer(conn => {
 
 		}
 		else if (message === 'next' && type === 'teller' && connectedCustomers.length) {
+
 			let servingCustomer = connectedCustomers.shift()
 			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.`)
 			send_message(conn, `You have ${connectedCustomers.length} waiting in line.`)
 
+			displayQueuePosition()
 
+			send_message(conn, '[ CHAT ]\n')
+			send_message(servingCustomer.conn, '[ CHAT ]\n')
+			send_message(conn, '(you) What can I help you with?\n')
+			send_message(servingCustomer.conn, '[ TELLER ] What can I help you with?\n')
+
+			send_message(
+				conn,
+				`[CUSTOMER ACCOUNT]
+				   Status:Active
+				   Balance: ${servingCustomer.balance}`
+			  )
 
 		}
 
@@ -89,7 +101,7 @@ const server = net.createServer(conn => {
 			send_message(conn, `The Bank is ${red('closed')}`)
 			send_message(conn, `[ SYSTEM ] The Bank is ${red('closed')}`)
 		}
-		else {
+		else if (type === 'customer') {
 			send_message(conn, `[ SYSTEM ] You are not currently being served.`)
 		}
 		// send_message(conn, `I, the Bank, received: ${message}`)
