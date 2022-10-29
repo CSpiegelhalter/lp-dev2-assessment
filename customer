@@ -30,7 +30,7 @@ handle_input(line => {
 
 handle_message(conn, packet => {
 
-	console.log('Message received:', packet.message)
+	console.log(packet.message)
 })
 
 

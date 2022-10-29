@@ -77,22 +77,12 @@ const server = net.createServer(conn => {
 		else if (message === 'next' && type === 'teller' && connectedCustomers.length) {
 
 			let servingCustomer = connectedCustomers.shift()
-			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.`)
-			send_message(conn, `You have ${connectedCustomers.length} waiting in line.`)
+			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
 
 			displayQueuePosition()
 
-			send_message(conn, '[ CHAT ]\n')
-			send_message(servingCustomer.conn, '[ CHAT ]\n')
-			send_message(conn, '(you) What can I help you with?\n')
-			send_message(servingCustomer.conn, '[ TELLER ] What can I help you with?\n')
+			send_message(servingCustomer.conn, '[ CHAT ]\n[ TELLER ] What can I help you with?\n')
 
-			send_message(
-				conn,
-				`[CUSTOMER ACCOUNT]
-				   Status:Active
-				   Balance: ${servingCustomer.balance}`
-			  )
 
 		}
 
