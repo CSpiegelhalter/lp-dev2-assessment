@@ -42,7 +42,10 @@ function displayQueuePosition() {
 
 function inChat(current, message) {
 
-
+	if (current.role === 'customer' && current.transacting) {
+		send_message(current.conn, '[ SYSTEM ] You already have a transaction in progress. Please wait.')
+		return
+	}
 	let id = current.serverId
 
 	let server = connectedTellers.find((teller) => teller.serverId === id)
@@ -72,6 +75,8 @@ function inChat(current, message) {
 		let willOverdraft = remainingBalance < 0
 		if (willOverdraft) {
 			send_message(customer.conn, `[ SYSTEM ] You have insufficient funds. Funds available: $${customer.balance}`)
+			send_message(server.conn, `[ WARNING: Denied overdraft. Attempted withdrawal: $${withdrawAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
+			return
 		}
 		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
 
