@@ -1,13 +1,10 @@
 #!/usr/bin/env node
 
 const net = require('net')
-const { handle_message, send_message, red, green, Customer, Teller, guidGenerator, updateChat, toNumber } = require('./lib/helpers')
+const { handle_message, send_message, red, green, Customer, Teller, guidGenerator, updateChat, toNumber, connectedTellers, connectedCustomers, currentlyBeingServed, removeClosedConnections } = require('./lib/helpers')
 const SOCKET = "./bank.sock"
 // let Customer = require('./customer')
 
-let connectedTellers = []
-let connectedCustomers = []
-let currentlyBeingServed = []
 let customerCount = 1
 let openForTheDay = false
 
@@ -33,6 +30,9 @@ function displayQueuePosition() {
 					`There is ${connectedCustomers.length -
 					1} customers in line ahead of you`
 				)
+			}
+			if (!connectedTellers.length) {
+				send_message(customer.conn, '[ SYSTEM ] There are currently no tellers available. Please wait.\n')
 			}
 
 		})
@@ -86,9 +86,8 @@ function inChat(current, message) {
 
 	}
 	else if (message === 'yes') {
-		send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]`)
 		customer.balance -= customer.transactionAmount
-		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
+		send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
 
 		send_message(customer.conn, `[ TELLER ] Your withdrawal is complete! Your new balance is $${customer.balance}\n`)
 		customer.transactionAmount = 0
@@ -118,7 +117,7 @@ const server = net.createServer(conn => {
 
 
 
-		if (current && current.serverId) {
+		if (current && current.serverId && message !== 'next') {
 			inChat(current, message)
 		}
 		// Checks for customer connection
@@ -145,24 +144,39 @@ const server = net.createServer(conn => {
 			displayQueuePosition()
 
 		}
-		else if (message === 'next' && type === 'teller' && connectedCustomers.length) {
+		else if (message === 'next' && type === 'teller') {
 			let currentTeller = connectedTellers.find((teller) => teller.conn === conn)
-			let servingCustomer = connectedCustomers.shift()
-			currentlyBeingServed.push(servingCustomer)
-			let newUid = guidGenerator()
-			currentTeller.serverId = newUid
-			servingCustomer.serverId = newUid
-			send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
+			if (currentTeller.serverId) {
+				let oldCustomer = currentlyBeingServed.find((cust) => cust.serverId === currentTeller.serverId)
+				currentTeller.serverId = null
+				send_message(oldCustomer.conn, `[ TELLER ] Ok, you're done. Have a great day!\n\n[ DISCONNECTED ]`)
+				oldCustomer.conn.destroy()
+				const index = currentlyBeingServed.indexOf(oldCustomer)
+				if (index > -1) {
+					currentlyBeingServed.splice(index, 1)
+				}
+			}
+			if (connectedCustomers.length) {
+				let servingCustomer = connectedCustomers.shift()
+				currentlyBeingServed.push(servingCustomer)
+				let newUid = guidGenerator()
+				currentTeller.serverId = newUid
+				servingCustomer.serverId = newUid
+				send_message(conn, `You are serving customer #${servingCustomer.customerCount}.\nYou have ${connectedCustomers.length} customer(s) waiting in line.\n\n[ CHAT ]\n(you) What can I help you with?\n\n[CUSTOMER ACCOUNT]\nStatus:Active\nBalance: ${servingCustomer.balance}\n`)
 
-			displayQueuePosition()
+				displayQueuePosition()
 
-			send_message(servingCustomer.conn, '[ CHAT ]\n[ TELLER ] What can I help you with?\n')
+				send_message(servingCustomer.conn, '[ CHAT ]\n[ TELLER ] What can I help you with?\n')
+			}
+			else {
+				send_message(currentTeller.conn, 'You are not serving any customers.\nYou have 0 customers waiting in line.')
+			}
 
 
 		}
 
 		// Recieved a message with no connected tellers
-		else if (!connectedTellers.length) {
+		else if (!connectedTellers.length && type === 'customer') {
 			send_message(conn, `The Bank is ${red('closed')}\n[ SYSTEM ] The Bank is ${red('closed')}`)
 		}
 		else if (type === 'customer') {
@@ -171,19 +185,14 @@ const server = net.createServer(conn => {
 	})
 
 
-	conn.on('close', () => {
+
+
+	conn.on('close', (conn) => {
+		removeClosedConnections()
+		displayQueuePosition()
 		console.log('client disconnected')
 	})
 })
-
-
-
-
-
-
-
-
-
 
 server.listen(SOCKET)
 console.log(`Bank server is listening...`)
