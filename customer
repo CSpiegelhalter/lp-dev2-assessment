@@ -22,7 +22,7 @@ function connection_closed() {
 
 
 handle_input(line => {
-	console.log(`Prompt command entered:`, line)
+	// console.log(`Prompt command entered:`, line)
 	send_message(conn, line)
 })
 

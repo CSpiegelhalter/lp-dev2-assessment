@@ -14,18 +14,28 @@ const server = net.createServer(conn => {
 	handle_message(conn, message => {
 		console.log('received:', message)
 
+		// Checks for customer connection
 		if (message === 'customer') {
 			console.log('Customer connected')
+
+			// No tellers connected
 			if (!connectedTellers.length) {
 				send_message(conn, `The Bank is ${red('closed.')}`)
 			}
 		}
 
-		if (message === 'teller') {
+		// Checks for teller connection
+		else if (message === 'teller') {
 			console.log('Teller connected')
 			connectedTellers.push(conn)
 		}
-		send_message(conn, `I, the Bank, received: ${message}`)
+
+		// Recieved a message with no connected tellers
+		else if (!connectedTellers.length) {
+			send_message(conn, `The Bank is ${red('closed')}`)
+			send_message(conn, `[ SYSTEM ] The Bank is ${red('closed')}`)
+		}
+		// send_message(conn, `I, the Bank, received: ${message}`)
 	})
 
 
