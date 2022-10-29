@@ -13,6 +13,10 @@ const server = net.createServer(conn => {
 
 	handle_message(conn, message => {
 		console.log('received:', message)
+
+		if (message === 'customer') {
+			console.log('Customer connected')
+		}
 		send_message(conn, `I, the Bank, received: ${message}`)
 	})
 

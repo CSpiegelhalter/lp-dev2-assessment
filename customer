@@ -10,6 +10,7 @@ function connection_ready() {
 	render([
 		'Hello Customer'
 	])
+	send_message(conn, 'customer')
 }
 
 
