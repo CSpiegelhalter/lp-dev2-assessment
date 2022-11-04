@@ -97,9 +97,12 @@ function inChat(current, message) {
 			return
 		}
 
-		// We wait for teller to confirm the transaction
-		send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
-		send_message(customer.conn, '[ TELLER ] Please wait while I review the transaction...')
+		setTimeout(() => {
+			// We wait for teller to confirm the transaction
+			send_message(server.conn, `[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n\n[ TRANSACTION: WITHDRAWAL $${withdrawAmount} ]\nWill overdraft: ${willOverdraft ? 'Yes' : 'No'}\nDo you approve? (Yes/No)`)
+			send_message(customer.conn, '[ TELLER ] Please wait while I review the transaction...')
+		}, 500)
+
 
 		// Set values so customer cannot try to do another transaction before this one is comeplete
 		customer.transacting = true
@@ -120,7 +123,11 @@ function inChat(current, message) {
 	else if (message === 'no') {
 		send_message(server.conn, `[ WITHDRAWAL DENIED: $${customer.transactionAmount} ]`)
 
-		send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.transactionAmount} is DENIED! Get lost sucker!\n`)
+		setTimeout(() => {
+			send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.transactionAmount} is DENIED! Get lost sucker!\n`)
+		}, 1000)
+		
+		
 
 		// Reset values so customer can try another transaction
 		customer.transactionAmount = 0
@@ -180,6 +187,7 @@ const server = net.createServer(conn => {
 				send_message(oldCustomer.conn, `[ TELLER ] Ok, you're done. Have a great day!\n\n[ DISCONNECTED ]`)
 
 				// Let them down.... easy
+				oldCustomer.serverId = null
 				oldCustomer.conn.destroy()
 				removeClosedConnections()
 			}
