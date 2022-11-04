@@ -86,6 +86,10 @@ function inChat(current, message) {
 			updateChat(current, server, customer, 'Invalid withdraw statement... Try again with a dollar amount')
 			return
 		}
+		if (!withdrawAmount) {
+			updateChat(current, server, customer, 'Invalid withdraw statement... Try again with a dollar amount')
+			return
+		}
 
 		let remainingBalance = customer.balance - withdrawAmount
 		let willOverdraft = remainingBalance < 0
@@ -112,18 +116,19 @@ function inChat(current, message) {
 	// Teller confirms transaction
 	else if (message === 'yes') {
 		customer.balance -= customer.transactionAmount
-		send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
 
-		send_message(customer.conn, `[ TELLER ] Your withdrawal is complete! Your new balance is $${customer.balance}\n`)
+		setTimeout(() => {
+			send_message(server.conn, `[ WITHDRAWAL MADE: $${customer.transactionAmount} ]\n\n[ CUSTOMER ACCOUNT ]\nStatus: Active\nBalance: $${customer.balance}\n`)
+			send_message(customer.conn, `[ TELLER ] Your withdrawal is complete! Your new balance is $${customer.balance}\n`)
+		}, 1000)
 
 		// Reset values so customer can try another transaction
 		customer.transactionAmount = 0
 		customer.transacting = false
 	}
 	else if (message === 'no') {
-		send_message(server.conn, `[ WITHDRAWAL DENIED: $${customer.transactionAmount} ]`)
-
 		setTimeout(() => {
+			send_message(server.conn, `[ WITHDRAWAL DENIED: $${customer.transactionAmount} ]`)
 			send_message(customer.conn, `[ TELLER ] Your withdrawal of $${customer.transactionAmount} is DENIED! Get lost sucker!\n`)
 		}, 1000)
 		
