@@ -32,8 +32,7 @@ function displayQueuePosition() {
 				setTimeout(() => {
 					send_message(
 						customer.conn,
-						`There is ${connectedCustomers.length -
-						1} customers in line ahead of you`
+						`There is ${index} customers in line ahead of you`
 					)
 				}, 300)
 
